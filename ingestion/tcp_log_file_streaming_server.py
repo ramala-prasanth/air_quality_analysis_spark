@@ -9,8 +9,8 @@ TCP_HOST = 'localhost'  # The host to bind the server
 TCP_PORT = 9999  # The port on which to listen for incoming connections
 
 # Folder Paths
-LOG_FOLDER_PATH = '/workspaces/air_quality_analysis_spark/ingestion/data/pending'  # Path to the folder containing log files
-PROCESSED_FOLDER_PATH = os.path.join('/workspaces/air_quality_analysis_spark/ingestion/data/', 'processed')  # Subfolder where processed logs will be moved
+LOG_FOLDER_PATH = 'ingestion/data/pending'  # Path to the folder containing log files
+PROCESSED_FOLDER_PATH = os.path.join('ingestion/data/', 'processed')  # Subfolder where processed logs will be moved
 
 
 def create_tcp_server():
