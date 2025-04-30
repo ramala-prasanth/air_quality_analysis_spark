@@ -1,0 +1,1 @@
+{"class":"org.apache.spark.ml.feature.VectorAssembler","timestamp":1745986129494,"sparkVersion":"3.5.5","uid":"VectorAssembler_ba1c55bc28d9","paramMap":{"inputCols":["pm25_lag_1","temperature_lag_1","pm25_rate_of_change","temperature_rate_of_change"],"outputCol":"features"},"defaultParamMap":{"handleInvalid":"error","outputCol":"VectorAssembler_ba1c55bc28d9__output"}}

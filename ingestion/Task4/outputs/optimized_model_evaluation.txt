@@ -1,0 +1,5 @@
+Hyperparameter Tuning Results (Random Forest Regressor)
+Best maxDepth: 15
+Best numTrees: 100
+RMSE: 11.03
+R²: 0.98

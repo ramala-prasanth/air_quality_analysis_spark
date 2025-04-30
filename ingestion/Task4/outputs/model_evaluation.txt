@@ -1,0 +1,7 @@
+📈 Random Forest Regression (PM2.5 Prediction)
+✅ RMSE: 14.43
+✅ R²: 0.96
+
+📊 Random Forest Classification (AQI Category Prediction)
+✅ Accuracy: 0.98
+✅ F1 Score: 0.98
