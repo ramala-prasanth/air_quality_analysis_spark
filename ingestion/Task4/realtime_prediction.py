@@ -1,66 +1,79 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import *
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType, DoubleType
-from pyspark.ml import PipelineModel
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.regression import RandomForestRegressor
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.sql.functions import col
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# Step 1: Start Spark Session
+# Initialize Spark session
 spark = SparkSession.builder \
-    .appName("RealTimeAirQualityPrediction") \
+    .appName("AirQualityPrediction") \
     .getOrCreate()
 
-spark.sparkContext.setLogLevel("WARN")
-
-# Step 2: Define schema matching the streaming data
+# Define the schema based on your provided data
 schema = StructType([
-    StructField("location", StringType()),
-    StructField("timestamp", TimestampType()),
-    StructField("pm25", DoubleType()),
-    StructField("temperature", DoubleType()),
-    StructField("humidity", DoubleType()),
-    StructField("pm25_lag_1", DoubleType()),
-    StructField("temperature_lag_1", DoubleType()),
-    StructField("pm25_rate_of_change", DoubleType()),
-    StructField("temperature_rate_of_change", DoubleType())
+    StructField("location", StringType(), True),
+    StructField("timestamp", StringType(), True),
+    StructField("pm25", DoubleType(), True),
+    StructField("temperature", DoubleType(), True),
+    StructField("humidity", DoubleType(), True),
+    StructField("pm25_scaled", DoubleType(), True),
+    StructField("temperature_scaled", DoubleType(), True),
+    StructField("humidity_scaled", DoubleType(), True),
+    StructField("date", StringType(), True),
+    StructField("hour", StringType(), True),
+    StructField("pm25_roll_avg_3", DoubleType(), True),
+    StructField("temperature_roll_avg_3", DoubleType(), True),
+    StructField("pm25_lag_1", DoubleType(), True),
+    StructField("temperature_lag_1", DoubleType(), True),
+    StructField("pm25_rate_of_change", DoubleType(), True),
+    StructField("temperature_rate_of_change", DoubleType(), True)
 ])
 
-# Step 3: Read from TCP stream (e.g., nc -lk 9999)
-stream_df = spark.readStream \
-    .format("socket") \
-    .option("host", "localhost") \
-    .option("port", 9999) \
-    .load()
+# Load data from CSV
+data_path = "task4_input.csv"  # Replace with your actual file path
+df = spark.read.csv(data_path, header=True, schema=schema)
 
-# Step 4: Parse CSV line into structured DataFrame
-def parse_csv_line(line):
-    parts = line.split(",")
-    return (
-        parts[0],  # location
-        parts[1],  # timestamp
-        float(parts[2]),
-        float(parts[3]),
-        float(parts[4]),
-        float(parts[5]),
-        float(parts[6]),
-        float(parts[7]),
-        float(parts[8])
-    )
+# Clean data (drop rows with nulls in important columns)
+feature_cols = ["pm25_lag_1", "temperature_lag_1", "pm25_rate_of_change", "temperature_rate_of_change"]
+df_clean = df.dropna(subset=feature_cols + ["pm25"])
 
-parse_udf = udf(parse_csv_line, schema)
+# Check if the dataset is empty
+if df_clean.count() == 0:
+    print("The dataset is empty. Please check your input file.")
+    exit()
 
-structured_df = stream_df.withColumn("parsed", parse_udf("value")).select("parsed.*")
+# Set up feature assembler and model
+assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
+regressor = RandomForestRegressor(featuresCol="features", labelCol="pm25")
 
-# Step 5: Load trained PipelineModel (which includes feature assembly)
-model = PipelineModel.load("/workspaces/air_quality_analysis_spark/ingestion/Task4/models/pm25_rf_pipeline")
+# Build pipeline
+pipeline = Pipeline(stages=[assembler, regressor])
 
-# Step 6: Predict using model (features will be auto-generated in the pipeline)
-predicted_df = model.transform(structured_df).select("location", "timestamp", "prediction")
+# Train/test split (80/20)
+train_df, test_df = df_clean.randomSplit([0.8, 0.2], seed=42)
 
-# Step 7: Write predictions to CSV files (streaming)
-query = predicted_df.writeStream \
-    .outputMode("append") \
+# Train the model
+pipeline_model = pipeline.fit(train_df)
+
+# Make predictions
+predictions = pipeline_model.transform(test_df)
+
+# Evaluate model performance
+evaluator = RegressionEvaluator(labelCol="pm25", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(predictions)
+r2 = evaluator.setMetricName("r2").evaluate(predictions)
+
+print(f"✅ Model trained. RMSE: {rmse:.2f}, R²: {r2:.2f}")
+
+# Save predictions to CSV including location, timestamp, temperature, humidity, pm25, and prediction
+output_path = "output_predictions"
+predictions.select("location", "timestamp", "temperature", "humidity", "pm25", "prediction").write \
     .format("csv") \
-    .option("path", "outputs/realtime_predictions") \
-    .option("checkpointLocation", "checkpoints/realtime_prediction") \
-    .start()
+    .option("path", output_path) \
+    .option("header", "true") \
+    .mode("overwrite") \
+    .save()
 
-query.awaitTermination()
+print(f"✅ Predictions saved to {output_path}")

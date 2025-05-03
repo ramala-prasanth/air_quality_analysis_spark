@@ -1,0 +1,2 @@
+v1
+{"path":"file:///workspaces/air_quality_analysis_spark/ingestion/Task4/outputs/realtime_prediction/part-00000-eb6c51d1-8b4a-43fe-b1e1-935eae6fba85-c000.csv","size":30,"isDir":false,"modificationTime":1746234191973,"blockReplication":1,"blockSize":33554432,"action":"add"}
